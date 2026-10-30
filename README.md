@@ -1,110 +1,179 @@
-# Simple RISC CPU
+# DE1-SoC 16-Bit RISC CPU
 
-This is a standalone continuation of the implementation in `../lab7` (the
-folder literally named `lab7`, not the GitHub Classroom starter). It retains
-that design's single-read register file, clocked A/B/C datapath, instruction
-format, and multi-cycle approach, then completes the stored-program portion
-that was still empty in `lab7/ram.sv` and `lab7/lab7_top.sv`. The source
-`lab7` folder is unchanged.
+A custom 16-bit, multi-cycle RISC processor implemented in SystemVerilog for
+the Intel DE1-SoC FPGA development board. The project covers the complete path
+from instruction fetch and decoding through execution, memory access, and
+writeback, with self-checking simulations and example assembly programs.
 
-## How this extends the original work
+The current design is a working stored-program processor with a custom
+instruction set. It is intentionally compact enough to understand at the
+register-transfer level while still demonstrating the core architecture of a
+general-purpose CPU.
 
-- `lab7/REGFILE.sv` became `rtl/core/regfile.sv`; named `R0`-`R7` registers and
-  the single read port are retained, with deterministic reset added.
-- `lab7/datapath.sv` became `rtl/core/datapath.sv`; its A, B, C, status, `vsel`,
-  `asel`, and `bsel` organization is retained.
-- `lab7/state_machine.sv`, `instruc_dec.sv`, and `cpu.sv` are extended in
-  `rtl/core/cpu.sv` with autonomous fetch, a PC, memory cycles, and branch states.
-- The shifter behavior and four ALU operations are retained; signed overflow
-  and status handling are corrected.
-- The empty RAM and top level are completed as `memory.sv` and `lab7_top.sv`.
+## Current capabilities
 
-## What is implemented
+- 16-bit instructions and datapath
+- Eight 16-bit general-purpose registers (`R0` through `R7`)
+- 8-bit program counter
+- Unified 256 x 16-bit instruction and data memory
+- Multi-cycle fetch, decode, execute, memory, and writeback control
+- Clocked A, B, C, and status registers
+- Zero (`Z`), negative (`N`), and overflow (`V`) condition flags
+- Signed immediate and displacement handling
+- Register, immediate, and shifted-register operations
+- PC-relative and register-indirect control flow
+- Function calls using `R7` as the link register
+- Halt detection and FPGA-visible execution state
+- Self-checking integration simulations
+- Quartus project for the DE1-SoC Cyclone V FPGA
 
-- 16-bit data path and eight 16-bit registers (`R0`-`R7`)
-- 8-bit program counter and 256 x 16-bit unified instruction/data memory
-- `ADD`, `AND`, `CMP`, `MVN`, register/immediate `MOV`
-- `LSL #1`, `LSR #1`, and `ASR #1` operand shifts
-- `LDR` and `STR` with signed 5-bit displacement
-- `B`, `BEQ`, `BNE`, `BLT`, `BLE`, `BL`, `BX`, and `BLX`
-- `NOP`, `HALT`, and `Z/N/V` condition flags
-- Lab-style DE1-SoC wrapper and a self-checking system simulation
+## Instruction set
 
-Your instruction encoding matches the `sas` assembler under
-`../lab-7-l1a-kathrynezong/assembler`. `R7` is the link register for `BL` and
-`BLX`, and memory remains word addressed.
+| Category | Instructions |
+|---|---|
+| Data movement | `MOV` immediate and register |
+| Arithmetic | `ADD`, `CMP` |
+| Logic | `AND`, `MVN` |
+| Shifts | `LSL #1`, `LSR #1`, `ASR #1` |
+| Memory | `LDR`, `STR` with signed displacement |
+| Branches | `B`, `BEQ`, `BNE`, `BLT`, `BLE` |
+| Functions | `BL`, `BX`, `BLX` |
+| Control | `NOP`, `HALT` |
 
-## Project layout
+Additional encoding details are documented in [docs/isa.md](docs/isa.md).
+
+## Architecture
+
+```text
+                     +-------------------+
+                     | Multi-cycle       |
+                     | CPU controller    |
+                     | PC + instruction  |
+                     | register          |
+                     +---------+---------+
+                               |
+             control signals   |   status flags
+                               v
+  +----------+      +-----------------------+      +----------+
+  | Unified  |<---->| A/B/C staged datapath |<---->| Register |
+  | memory   |      | ALU + operand shifter |      | file     |
+  +----------+      +-----------------------+      +----------+
+```
+
+Each instruction is completed over several clock cycles. The controller
+selects registers, captures operands in the A and B registers, performs the
+operation, optionally accesses memory, and writes the result back. This keeps
+the hardware small and makes each stage observable during simulation.
+
+See [docs/architecture.md](docs/architecture.md) for more detail.
+
+## Repository structure
 
 ```text
 rtl/
   core/                CPU, datapath, ALU, shifter and register file
-  memory/              unified memory
-  system/              reusable CPU + memory top
-  board/               DE1-SoC wrapper and display logic
+  memory/              unified instruction/data memory
+  system/              reusable CPU and memory integration
+  board/               DE1-SoC wrapper and seven-segment display logic
 verification/
-  unit/                focused module/instruction tests
+  unit/                focused module and instruction tests
   integration/         complete-program system tests
 software/
-  assembly/            human-readable assembly sources
-  images/              assembled binary memory images
-docs/                   architecture and ISA documentation
+  assembly/            human-readable example programs
+  images/              assembled memory initialization files
+docs/                   architecture and instruction-set documentation
 scripts/                simulation and compatibility-check commands
 simple_risc.qpf/.qsf    Quartus project configuration
 ```
 
-## Run the simulation
+Generated ModelSim and Quartus files are excluded through `.gitignore`.
 
-From this directory:
+## Verification
+
+The integration testbench runs two programs concurrently:
+
+1. A load/store program that reads `0xABCD` from memory, writes it to another
+   address, and verifies the affected registers and memory.
+2. A conditional-branch loop that exercises `MOV`, `ADD`, `CMP`, and a
+   backwards `BLT` until the expected result is reached.
+
+The current simulations compile with zero ModelSim errors or warnings and
+finish with a self-checking `PASS` result.
+
+### Run the simulation
+
+From the repository root:
 
 ```powershell
 ./scripts/run-tests.ps1
 ```
 
-The script uses Icarus Verilog when it is on `PATH`; otherwise it detects the
-ModelSim bundled with Intel FPGA Lite 18.1 at its standard Windows location.
+The script uses Icarus Verilog when available. On Windows, it can also detect
+the ModelSim installation bundled with Intel FPGA Lite 18.1.
 
-The test runs two programs. The first is the short load/store program referenced
-by the Lab 7 checker: it loads `16'hABCD` from address 5 into `R1`, stores it at
-address 6, and halts. The second exercises `ADD`, `CMP`, and a backwards `BLT`
-loop. The test checks registers, memory, and termination; a passing run prints
-`PASS`.
+## FPGA usage
 
-Run the checker from your actual `../lab7` folder with:
+Open `simple_risc.qpf` in Quartus. The project targets the Cyclone V device on
+the DE1-SoC. Import the appropriate DE1-SoC pin assignments before performing
+a complete board build.
 
-```powershell
-./scripts/run-lab7-check.ps1
-```
+The current board wrapper exposes:
 
-The current result is `INTERFACE OK` with zero ModelSim compile errors or
-warnings.
-
-## Use the supplied assembler
-
-Assemble a source file with `sas` from the Lab 7 folder, then copy its binary
-text output into `software/images/`. Change the `INIT_FILE` parameter in your system
-or testbench to select the image. Each line is one 16-bit binary word.
-
-## FPGA notes
-
-Open `simple_risc.qpf` in Quartus. The included settings select the DE1-SoC's
-Cyclone V and source files, but deliberately do not duplicate the board pin
-map. Import the known-good pin assignments from
-`../lab-7-l1a-kathrynezong/DE1_SoC.qsf` before compiling.
-
-- `KEY0`: step clock
+- `KEY0`: manual CPU clock
 - `KEY1`: reset while pressed
-- `LEDR[9]`: halted
+- `LEDR[9]`: processor halted
 - `LEDR[8]`: memory write active
 - `LEDR[7:0]`: current memory address
 - `HEX3..HEX0`: most recent execution result
 - `HEX5`: `N`, `V`, and `Z` flags
 
-## Lab-to-project map
+## Development roadmap
 
-Lab 3 introduces clocked RTL and board I/O. Lab 5 contributes the register
-file, shifter, ALU, and datapath concepts. Lab 6 adds instruction decoding and
-the multi-cycle controller. Lab 7 makes the CPU a usable stored-program
-machine by adding PC-relative control flow, load/store instructions, memory,
-and an assembler. This project uses that full progression rather than treating
-Lab 6 as an isolated design.
+The following phases are intentionally scoped for incremental development.
+
+### Phase 1: Verification and documentation
+
+- Add self-checking unit tests for the ALU, shifter, and register file
+- Add one instruction-level test for every supported opcode
+- Test negative values, signed overflow, branch boundaries, and disabled writes
+- Add example programs such as Fibonacci, array sum, and a countdown loop
+- Complete binary field diagrams and encoding examples in the ISA reference
+
+### Phase 2: Memory-mapped board I/O
+
+- Reserve addresses for LEDs, switches, push buttons, and seven-segment output
+- Route `LDR` and `STR` transactions to either RAM or the selected peripheral
+- Add simulation models for peripheral reads and writes
+- Write an assembly demo that reads switches and displays a calculated result
+
+Proposed memory map:
+
+| Address | Device |
+|---|---|
+| `0xF0` | Red LEDs |
+| `0xF1` | Slide switches |
+| `0xF2` | Push buttons |
+| `0xF3` | Seven-segment output |
+
+### Phase 3: On-board debugging controls
+
+- Add run, pause, reset, and single-step operation
+- Add a selectable divided clock for continuous execution
+- Display the PC, instruction, result, flags, or selected register on the HEX
+  displays
+- Make internal CPU state easier to observe during hardware demonstrations
+
+### Phase 4: Final integration and demonstration
+
+- Run the full regression suite
+- Complete the Quartus board build and hardware validation
+- Document switch, button, LED, and display behavior
+- Create a demonstration program using memory-mapped input and output
+- Add waveform captures and an updated architecture diagram
+
+## Project goal
+
+The planned final result is a complete 16-bit FPGA system-on-chip that executes
+assembly programs from memory, performs arithmetic and control flow, interacts
+with DE1-SoC peripherals through memory-mapped I/O, and supports convenient
+on-board debugging.
