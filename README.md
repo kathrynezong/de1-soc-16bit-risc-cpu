@@ -25,6 +25,7 @@ general-purpose CPU.
 - Function calls using `R7` as the link register
 - Halt detection and FPGA-visible execution state
 - Self-checking integration simulations
+- UVM 1.2 smoke test and reusable verification-environment scaffold
 - Quartus project for the DE1-SoC Cyclone V FPGA
 
 ## Instruction set
@@ -78,6 +79,7 @@ rtl/
 verification/
   unit/                focused module and instruction tests
   integration/         complete-program system tests
+  cpu_uvm/             UVM package, tests, environment and planned agents
 software/
   assembly/            human-readable example programs
   images/              assembled memory initialization files
@@ -110,6 +112,18 @@ From the repository root:
 
 The script uses Icarus Verilog when available. On Windows, it can also detect
 the ModelSim installation bundled with Intel FPGA Lite 18.1.
+
+### Run the UVM smoke test
+
+```powershell
+./scripts/run-uvm-tests.ps1
+```
+
+The smoke test compiles UVM 1.2, runs through UVM phasing, and finishes with
+zero UVM errors or fatals. The installed ModelSim Starter Edition supports the
+basic UVM structure but reports constrained randomization, functional coverage,
+and assertions as Questa-only features. The UVM directory is structured so the
+same environment can be expanded under Questa without reorganizing the project.
 
 ## FPGA usage
 
