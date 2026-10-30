@@ -1,0 +1,11 @@
+build/
+db/
+incremental_db/
+output_files/
+*.qws
+*.vcd
+*.wlf
+transcript
+*.rpt
+*.smsg
+*.summary

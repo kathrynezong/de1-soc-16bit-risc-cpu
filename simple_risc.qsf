@@ -1,0 +1,12 @@
+set_global_assignment -name FAMILY "Cyclone V"
+set_global_assignment -name DEVICE 5CSEMA5F31C6
+set_global_assignment -name TOP_LEVEL_ENTITY lab7_top
+set_global_assignment -name NUM_PARALLEL_PROCESSORS 4
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/core/shifter.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/core/alu.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/core/regfile.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/core/datapath.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/memory/memory.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/core/cpu.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/board/lab7_top.sv
+set_global_assignment -name VERILOG_INPUT_VERSION SYSTEMVERILOG_2005
